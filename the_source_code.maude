@@ -1,0 +1,81 @@
+mod FINDEL is
+    pr NAT . 
+    pr BOOL . 
+    pr INT .
+
+    sort Coin .
+    op EUR : -> Coin .
+    op USD : -> Coin .
+    op GBP : -> Coin .
+    op RUB : -> Coin .
+    op DZD : -> Coin .
+
+    sort Addr .
+    subsort Nat < Addr .
+   
+    sort Pair .
+    op _=_  : Nat Nat -> Pair .
+    subsort Pair < Addr .
+    subsort Addr < Int .
+    op nothing : -> Addr . 
+    op _;;_ : Addr Addr -> Addr [ assoc comm id: nothing ] .
+
+    sort Time .
+    subsort Nat < Time .
+    subsort Int < Time .
+
+    sort Instr .
+    op One       : Coin             -> Instr .
+    op Give      : Instr            -> Instr .
+    op None      :                  -> Instr .
+    op Scale     : Nat Instr        -> Instr .
+    op ScaleObs  : Addr Instr       -> Instr .
+    op Or        : Instr Instr      -> Instr .
+    op And       : Instr Instr      -> Instr .
+    op If        : Addr Instr Instr -> Instr .
+    op Timebound : Time Time Instr  -> Instr . 
+
+    sort Scale .
+    subsort Nat < Scale .
+    op nil : -> Scale .
+    op _;_ : Scale Scale -> Scale [assoc id: nil] .
+
+    sort State .
+    *** State = {Sender Balance, Receiver Balance, Current Time, Current contract, Scale Stack, Address}
+    op {_,_,_,_,_,_} : Nat Nat Nat Instr Scale Addr -> State .
+
+
+    vars S  S' R  R' k  k' T add v : Nat .
+    vars sc sc' : Scale .
+    vars I c c' c1 c1' c2 : Instr .
+    var C : Coin .
+    vars A A' Rest : Addr .
+    vars t0 t1 : Time .
+
+    rl [give]       : { S , R, T, Give(c), sc, A }    => { R, S, T, c, sc, A } .
+    
+    rl [one]        : { S , R, T, One(C), (k ; sc), A }     => { S - k, R + k, T, None, sc, A } .
+     
+    rl [scale]      : { S , R, T, Scale(k,c), (k' ; sc), A } => { S, R, T, c, (k * k' ; k' ; sc), A } .
+
+    rl [scaleobs]   : { S , R, T, ScaleObs(A,c), (k' ; sc), (add = k ;; Rest) } => { S, R, T, c, (k * k' ; k' ; sc), (add = k ;; Rest) } .
+    
+
+    crl [or1]       : {S, R, T, Or(c1, c2), sc, A } => { S',  R', T , None, sc', A'} if { S, R, T, c1, sc, A } => { S',  R', T , None, sc', A' } .
+    crl [or2]       : {S, R, T, Or(c1, c2), sc, A } => { S',  R', T , None, sc', A'} if  {S, R, T, c2, sc, A } => { S',  R', T , None, sc', A' } .
+
+    rl  [and-base]  : { S, R, T, And(None, c2), sc, A } => {S, R, T, c2, sc, A } .
+    crl [and]       : { S, R, T, And(c1  , c2), sc, A } => {S', R', T, And(c1', c2), sc', A} if c1 =/= None /\ {S, R, T, c1, sc, A } => {S', R', T, c1', sc', A} /\ c1 =/= c1' .
+ 
+    
+    rl  [if-false]  : { S, R, T, If (A, c1, c2), sc, (add = 0 ;; Rest) } =>  { S, R, T, c2, sc, (add = 0 ;; Rest) }  . ---false
+    crl [if-true]   : { S, R, T, If (A, c1, c2), sc, (add = v ;; Rest) } => { S, R, T, c1, sc, (add = v ;; Rest) } if v =/= 0  . ---true
+    
+    crl [timebound] : { S, R, T, Timebound(t0, t1, c), sc, A } => { S, R, T, c, sc, A}  if T >= t0 /\ T <= t1 .
+   
+    crl [tick]      : { S, R, T, c, sc, A} => {S, R, T + 1, c, sc, A} if T <= 10 .
+
+
+endm
+
+
